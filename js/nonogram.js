@@ -49,6 +49,8 @@ export class Nonogram {
         })
       }
     }
+
+    this.render(root)
   }
 
   render (root) {

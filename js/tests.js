@@ -94,15 +94,15 @@ async function runTestCase(testCase) {
 function reportResult(root, result) {
   let node = makeChild(root, 'tr')
 
-  result.input.render(makeChild(node, 'td'))
-  result.expected.render(makeChild(node, 'td'))
+  result.input.renderInitial(makeChild(node, 'td'))
+  result.expected.renderInitial(makeChild(node, 'td'))
 
   let resultTd = makeChild(node, 'td')
 
   if (!result.passed && result.error) {
     resultTd.innerText = result.errorDetails
   } else {
-    result.output.render(resultTd)
+    result.output.renderInitial(resultTd)
   }
 }
 
