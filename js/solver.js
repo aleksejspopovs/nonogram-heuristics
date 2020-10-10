@@ -1,5 +1,5 @@
 import {CellState} from './nonogram.js'
-import {arraysEqual, assert, countWhere, sum, takeAfter} from './utils.js'
+import {arraysEqual, assert, countWhere, reverse, sum, takeAfter} from './utils.js'
 
 async function stepIfModified(row, step) {
   if (row.consumeModifiedFlag()) {
@@ -154,7 +154,35 @@ function rowPlaceFirstBlock(row) {
 function rowMatchBlocksToHints(row) {
   // for each contiguous block of filled cells, try to figure out
   // which hints it might correspond to.
+
   let hints = row.hints() // cached
+  assert(hints.length > 0)
+
+  // first, for each hint, let's precompute the leftmost and rightmost
+  // coordinates where it might be found (same as in rowPlaceHint).
+  // TODO: unif&factor out this logic from here and rowPlaceHint.
+  let rowState = row.snapshot()
+  let hintLeftmost = [earliestStart(rowState, 0, hints[0])]
+  for (let i = 1; i < hints.length; i++) {
+    hintLeftmost.push(earliestStart(
+      rowState,
+      hintLeftmost[i - 1] + hints[i - 1] + 1,
+      hints[i],
+    ))
+  }
+  let rowStateM = row.mirror().snapshot()
+  let hintsM = reverse(hints)
+  let hintRightmost = [earliestStart(rowStateM, 0, hintsM[0])]
+  for (let i = 1; i < hintsM.length; i++) {
+    hintRightmost.push(earliestStart(
+      rowStateM,
+      hintRightmost[i - 1] + hintsM[i - 1] + 1,
+      hintsM[i],
+    ))
+  }
+  hintRightmost = reverse(hintRightmost).map(i => row.length() - 1 - i)
+
+  // now let's find the contiguous blocks.
   let left = 0
   while (left < row.length()) {
     if (row.get(left) !== CellState.Filled) {
@@ -168,11 +196,31 @@ function rowMatchBlocksToHints(row) {
     }
 
     // `left..right` is a contiguous block of filled cells.
+    // let's figure out how large it can grow (possibly by merging
+    // with other blocks).
+    let minLeft = left
+    while ((minLeft > 0) && (row.get(minLeft - 1) !== CellState.Empty)) {
+      minLeft--
+    }
+    let maxRight = right
+    while ((maxRight < row.length() - 1) && (row.get(maxRight + 1) !== CellState.Empty)) {
+      maxRight++
+    }
+
     let possibleHints = []
     for (let i = 0; i < hints.length; i++) {
       let hint = hints[i]
       if (hint < right - left + 1) {
         // hint is too small
+        continue
+      }
+      if (hint > maxRight - minLeft + 1) {
+        // hint is too big
+        continue
+      }
+      if ((left < hintLeftmost[i]) || (right > hintRightmost[i])) {
+        // block spills out of the area where the hint is allowed
+        // to be (or does not overlap with it at all).
         continue
       }
       // TODO: stronger checks here
@@ -192,6 +240,22 @@ function rowMatchBlocksToHints(row) {
       // if this must be the last block, everything to the right is empty
       for (let i = left + hints[hints.length - 1]; i < row.length(); i++) {
         row.set(i, CellState.Empty)
+      }
+    }
+
+    let minHint = Math.min(...Array.from(possibleHints, i => hints[i]))
+    // if the block can only grow one way, we can grow it to be
+    // as long as the smallest hint
+    if (left === minLeft) {
+      while (right < left + minHint - 1) {
+        right++
+        row.set(right, CellState.Filled)
+      }
+    }
+    if (right === maxRight) {
+      while (left > right - minHint + 1) {
+        left--
+        row.set(left, CellState.Filled)
       }
     }
 
