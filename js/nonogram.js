@@ -1,4 +1,5 @@
 import {enumerate, makeChild} from './utils.js'
+import {RowProxy, ColProxy} from './proxies.js'
 
 export let CellState = {
   Unknown: Symbol('CellState.Unknown'),
@@ -50,5 +51,13 @@ export class Nonogram {
         cell.classList.toggle('cell-empty', this.state[i][j] == CellState.Empty)
       }
     }
+  }
+
+  row (index) {
+    return new RowProxy(this, index)
+  }
+
+  col (index) {
+    return new ColProxy(this, index)
   }
 }
