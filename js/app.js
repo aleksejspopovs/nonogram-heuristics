@@ -17,7 +17,7 @@ function startSolving(nonogram) {
     console.log(`step in ${endTime - startTime} ms`)
 
     nonogram.render(root)
-    await sleep(100)
+    await sleep(10)
 
     startTime = performance.now()
   })
