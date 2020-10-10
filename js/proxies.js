@@ -1,5 +1,5 @@
 import {CellState} from './nonogram.js'
-import {assert} from './utils.js'
+import {assert, reverse} from './utils.js'
 
 class BaseProxy {
   constructor (nonogram) {
@@ -40,6 +40,30 @@ class BaseProxy {
     } else {
       assert(this.get(i) === state, 'overwriting a set cell')
     }
+  }
+
+  mirror () {
+    // returns a proxy object that acts just like `this`, except
+    // the coordinates are mirrored (so the 0th element is what
+    // used to be the last, etc). hints are also reversed accordingly.
+    // note that the proxy does not have its own `modified` flag
+    // ---it can write and consume `this.modified`!
+    let lengthCached = this.length()
+    return new Proxy(this, {
+      get: function (receiver, name) {
+        switch (name) {
+          case 'coords': {
+            return i => receiver.coords(lengthCached - 1 - i)
+          }
+          case 'hints': {
+            return () => reverse(receiver.hints())
+          }
+          default: {
+            return receiver[name]
+          }
+        }
+      }
+    })
   }
 
   consumeModifiedFlag () {

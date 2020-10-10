@@ -1,5 +1,5 @@
 import {CellState} from './nonogram.js'
-import {assert, countWhere, reverse, sum, takeAfter} from './utils.js'
+import {assert, countWhere, sum, takeAfter} from './utils.js'
 
 async function stepIfModified(row, step) {
   if (row.consumeModifiedFlag()) {
@@ -13,9 +13,9 @@ function blockCanStart(rowState, start, blockSize) {
   return takeAfter(rowState, start, blockSize).every(c => c != CellState.Empty)
 }
 
-function skipBlock(rowState, start, blockSize) {
+function earliestStart(rowState, start, blockSize) {
   // returns the earliest coordinate that a block of size `blockSize`
-  // (plus the empty cell after it) might end if it must be placed
+  // (plus the empty cell after it) might begin if it must be placed
   // at or after coordinate `start`.
 
   // if there is some cell among `start, start + 1, start + 2,
@@ -24,8 +24,7 @@ function skipBlock(rowState, start, blockSize) {
   while (!blockCanStart(rowState, start, blockSize)) {
     start++
   }
-  // place block here and skip the one empty cell after it.
-  return start + blockSize + 1
+  return start
 }
 
 function rowPlaceHint(row, index) {
@@ -36,20 +35,19 @@ function rowPlaceHint(row, index) {
 
   let rowState = row.snapshot()
   let leftSkip = 0
-  for (let i = 0; i <= index; i++) {
-    leftSkip = skipBlock(rowState, leftSkip, hints[i])
+  for (let i = 0; i < index; i++) {
+    leftSkip = earliestStart(rowState, leftSkip, hints[i])
+    leftSkip += hints[i] + 1
   }
-  // last iteration skipped over the current block too
-  // (we still run it because we want it to skip over any segments
-  // that are too short to fit the block)
-  leftSkip -= blockSize + 1
+  leftSkip = earliestStart(rowState, leftSkip, blockSize)
 
-  let rowStateM = reverse(rowState)
+  let rowStateM = row.mirror().snapshot()
   let rightSkip = 0
-  for (let i = row.hints().length - 1; i >= index; i--) {
-    rightSkip = skipBlock(rowStateM, rightSkip, hints[i])
+  for (let i = row.hints().length - 1; i > index; i--) {
+    rightSkip = earliestStart(rowStateM, rightSkip, hints[i])
+    rightSkip += hints[i] + 1
   }
-  rightSkip -= blockSize + 1
+  rightSkip = earliestStart(rowStateM, rightSkip, blockSize)
 
   assert(leftSkip + blockSize + rightSkip <= row.length())
 
@@ -76,19 +74,74 @@ function rowPlaceHint(row, index) {
       row.set(i, CellState.Filled)
     }
   }
+}
 
-  // additionally, if we're dealing with the first block,
-  // anything to the left of it is empty.
-  if (index === 0) {
-    for (let i = 0; i < left; i++) {
-      row.set(i, CellState.Empty)
-    }
+function rowPlaceFirstBlock(row) {
+  assert(row.hints().length > 0)
+
+  let blockSize = row.hints()[0]
+
+  // first, let's mark as empty all contiguous unknown blocks
+  // at the beginning that are too small to be the first block.
+  // e.g., if blockSize is 4,
+  //       .-..-.... -> -----....
+  let start = earliestStart(row.snapshot(), 0, blockSize)
+  for (let i = 0; i < start; i++) {
+    row.set(i, CellState.Empty)
   }
 
-  // and similarly for last block.
-  if (index === row.hints().length) {
-    for (let i = right + 1; i < row.length(); i++) {
-      row.set(i, CellState.Empty)
+  // now we know the first block cannot start to the left of
+  // `start`. if there are any blocks that are already filled
+  // among `start, start + 1, ..., start + blockSize - 1`, those
+  // must all belong to the first block (if they belong to
+  // the second, the first has nowhere to go), so we can
+  // connect them all and maybe get additional constraints.
+  if (!takeAfter(row.snapshot(), start, blockSize).some(c => c == CellState.Filled)) {
+    return
+  }
+  let leftmostFilled = start
+  while (row.get(leftmostFilled) != CellState.Filled) {
+    leftmostFilled++
+  }
+  let rightmostFilled = start + blockSize - 1
+  while (row.get(rightmostFilled) != CellState.Filled) {
+    rightmostFilled--
+  }
+
+  // e.g. .x.x... -> .xxx...
+  for (let i = leftmostFilled + 1; i < rightmostFilled; i++) {
+    row.set(i, CellState.Filled)
+  }
+
+  // if `rightmostFilled - start + 1 < blockSize`, then there are
+  // more cells to the right of `rightmostFilled` that are guaranteed
+  // to be filled.
+  // e.g. .xx... -> .xxx..
+  while (rightmostFilled - start + 1 < blockSize) {
+    rightmostFilled++
+    row.set(rightmostFilled, CellState.Filled)
+  }
+
+  // now, if `rightmostFilled` is in fact `start + blockSize - 1`,
+  // then it might be followed by more filled cells, which would
+  // then also be part of the first block. this allows us to mark
+  // some of `start, start + 1, ...` as empty.
+  // e.g. ..xxx.. -> -.xxx..
+  //         ^ rightmostFilled
+  while (
+    (rightmostFilled < row.length() - 1)
+    && (row.get(rightmostFilled + 1) == CellState.Filled)
+  ) {
+    row.set(start, CellState.Empty)
+    start++
+    rightmostFilled++
+  }
+
+  if (rightmostFilled - leftmostFilled + 1 === blockSize) {
+    // we have managed to locate the whole block, so we can put
+    // an empty to the right of it.
+    if (rightmostFilled < row.length() - 1) {
+      row.set(rightmostFilled + 1, CellState.Empty)
     }
   }
 }
@@ -141,6 +194,12 @@ async function solveRow(row, step) {
     rowPlaceHint(row, i)
     await stepIfModified(row, step)
   }
+
+  rowPlaceFirstBlock(row)
+  await stepIfModified(row, step)
+
+  rowPlaceFirstBlock(row.mirror())
+  await stepIfModified(row, step)
 
   rowDelimitCompleteBlocks(row)
   await stepIfModified(row, step)
