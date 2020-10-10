@@ -1,5 +1,5 @@
 import {CellState} from './nonogram.js'
-import {assert, countWhere, sum, takeAfter} from './utils.js'
+import {arraysEqual, assert, countWhere, sum, takeAfter} from './utils.js'
 
 async function stepIfModified(row, step) {
   if (row.consumeModifiedFlag()) {
@@ -151,22 +151,62 @@ function rowPlaceFirstBlock(row) {
   }
 }
 
-function rowDelimitCompleteBlocks(row) {
-  // if we find a contiguous block that's as long as the biggest hint,
-  // it must be surrounded by empties.
-  let maxBlockSize = Math.max(...row.hints())
-  let rowState = row.snapshot()
-  for (let i = 0; i < row.length() - maxBlockSize + 1; i++) {
-    if (takeAfter(rowState, i, maxBlockSize).every(c => c == CellState.Filled)) {
-      if (i > 0) {
-        assert(row.get(i - 1) != CellState.Filled)
-        row.set(i - 1, CellState.Empty)
+function rowMatchBlocksToHints(row) {
+  // for each contiguous block of filled cells, try to figure out
+  // which hints it might correspond to.
+  let hints = row.hints() // cached
+  let left = 0
+  while (left < row.length()) {
+    if (row.get(left) != CellState.Filled) {
+      left++
+      continue
+    }
+
+    let right = left
+    while ((right < row.length() - 1) && (row.get(right + 1) === CellState.Filled)) {
+      right++
+    }
+
+    // `left..right` is a contiguous block of filled cells.
+    let possibleHints = []
+    for (let i = 0; i < hints.length; i++) {
+      let hint = hints[i]
+      if (hint < right - left + 1) {
+        // hint is too small
+        continue
       }
-      if (i + maxBlockSize < row.length()) {
-        assert(row.get(i + maxBlockSize) != CellState.Filled)
-        row.set(i + maxBlockSize, CellState.Empty)
+      // TODO: stronger checks here
+      possibleHints.push(i)
+    }
+
+    assert(possibleHints.length > 0)
+
+    if (arraysEqual(possibleHints, [0])) {
+      // if this must be the first block, everything to the left is empty
+      for (let i = 0; i < right - hints[0] + 1; i++) {
+        row.set(i, CellState.Empty)
       }
     }
+
+    if (arraysEqual(possibleHints, [hints.length - 1])) {
+      // if this must be the last block, everything to the right is empty
+      for (let i = left + hints[hints.length - 1]; i < row.length(); i++) {
+        row.set(i, CellState.Empty)
+      }
+    }
+
+    if (possibleHints.every(i => hints[i] === right - left + 1)) {
+      // every hint says this block is complete, so we can put empties
+      // around it
+      if (left > 0) {
+        row.set(left - 1, CellState.Empty)
+      }
+      if (right < row.length() - 1) {
+        row.set(right + 1, CellState.Empty)
+      }
+    }
+
+    left = right + 1
   }
 }
 
@@ -206,7 +246,7 @@ async function solveRow(row, step) {
   rowPlaceFirstBlock(row.mirror())
   await stepIfModified(row, step)
 
-  rowDelimitCompleteBlocks(row)
+  rowMatchBlocksToHints(row)
   await stepIfModified(row, step)
 
   rowComplete(row)

@@ -43,3 +43,10 @@ export function sum(lst) {
 export function countWhere(filter, lst) {
   return sum(lst.map(x => filter(x) ? 1 : 0))
 }
+
+export function arraysEqual(lst1, lst2) {
+  if (lst1.length != lst2.length) {
+    return false
+  }
+  return lst1.every((value, idx) => value === lst2[idx])
+}
