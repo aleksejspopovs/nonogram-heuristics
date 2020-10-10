@@ -45,7 +45,7 @@ export function countWhere(filter, lst) {
 }
 
 export function arraysEqual(lst1, lst2) {
-  if (lst1.length != lst2.length) {
+  if (lst1.length !== lst2.length) {
     return false
   }
   return lst1.every((value, idx) => value === lst2[idx])

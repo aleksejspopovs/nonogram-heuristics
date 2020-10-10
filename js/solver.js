@@ -10,7 +10,7 @@ async function stepIfModified(row, step) {
 function blockCanStart(rowState, start, blockSize) {
   // returns true if none of the `blockSize` cells starting at `start`
   // are known to be empty.
-  return takeAfter(rowState, start, blockSize).every(c => c != CellState.Empty)
+  return takeAfter(rowState, start, blockSize).every(c => c !== CellState.Empty)
 }
 
 function earliestStart(rowState, start, blockSize) {
@@ -111,7 +111,7 @@ function rowPlaceFirstBlock(row) {
     return
   }
   let leftmostFilled = start
-  while (row.get(leftmostFilled) != CellState.Filled) {
+  while (row.get(leftmostFilled) !== CellState.Filled) {
     leftmostFilled++
   }
 
@@ -157,7 +157,7 @@ function rowMatchBlocksToHints(row) {
   let hints = row.hints() // cached
   let left = 0
   while (left < row.length()) {
-    if (row.get(left) != CellState.Filled) {
+    if (row.get(left) !== CellState.Filled) {
       left++
       continue
     }
