@@ -46,9 +46,9 @@ export class Nonogram {
     for (let i = 0; i < this.rows; i++) {
       for (let j = 0; j < this.cols; j++) {
         let cell = table.querySelector(`[data-coords="${i}-${j}"]`)
-        cell.classList.toggle('cell-unknown', this.state[i][j] == CellState.Unknown)
-        cell.classList.toggle('cell-filled', this.state[i][j] == CellState.Filled)
-        cell.classList.toggle('cell-empty', this.state[i][j] == CellState.Empty)
+        cell.classList.toggle('cell-unknown', this.state[i][j] === CellState.Unknown)
+        cell.classList.toggle('cell-filled', this.state[i][j] === CellState.Filled)
+        cell.classList.toggle('cell-empty', this.state[i][j] === CellState.Empty)
       }
     }
   }

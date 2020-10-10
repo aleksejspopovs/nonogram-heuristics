@@ -107,7 +107,7 @@ function rowPlaceFirstBlock(row) {
   // those must all belong to the first block (if they belong
   // to the second, the first has nowhere to go), so we can
   // connect them all and maybe get additional constraints.
-  if (!takeAfter(row.snapshot(), start, blockSize + 1).some(c => c == CellState.Filled)) {
+  if (!takeAfter(row.snapshot(), start, blockSize + 1).some(c => c === CellState.Filled)) {
     return
   }
   let leftmostFilled = start
@@ -135,7 +135,7 @@ function rowPlaceFirstBlock(row) {
   let rightmostFilled = start + blockSize - 1
   while (
     (rightmostFilled < row.length() - 1)
-    && (row.get(rightmostFilled + 1) == CellState.Filled)
+    && (row.get(rightmostFilled + 1) === CellState.Filled)
   ) {
     row.set(start, CellState.Empty)
     start++
