@@ -290,6 +290,7 @@ function rowComplete(row) {
   }
 }
 
+
 async function solveRow(row, step) {
   if (row.hints().length === 0) {
     for (let i = 0; i < row.length(); i++) {
@@ -315,6 +316,19 @@ async function solveRow(row, step) {
 
   rowComplete(row)
   await stepIfModified(row, step)
+}
+
+export async function solveSingleRowForTestingOnly(row, step) {
+  let progress = true
+  while (progress) {
+    progress = false
+    let stepAndUpdate = async () => {
+      progress = true
+      await step()
+    }
+
+    await solveRow(row, stepAndUpdate)
+  }
 }
 
 export async function solve(nonogram, step) {
