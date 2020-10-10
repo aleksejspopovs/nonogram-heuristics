@@ -23,25 +23,35 @@ export class Nonogram {
     }
   }
 
-  render (root) {
-    if (root.querySelector('table') === null) {
-      let table = makeChild(root, 'table')
+  renderInitial (root, clickCallback) {
+    let table = makeChild(root, 'table')
 
-      let trColHints = makeChild(table, 'tr')
-      makeChild(trColHints, 'td')
-      for (let hints of this.colHints) {
-        makeChild(trColHints, 'td', ['col-hints']).innerHTML = hints.join('<br>')
-      }
-
-      for (let [i, hints] of enumerate(this.rowHints)) {
-        let tr = makeChild(table, 'tr')
-        makeChild(tr, 'td', ['row-hints']).innerText = hints.join(' ')
-        for (let j = 0; j < this.cols; j++) {
-          makeChild(tr, 'td', ['cell']).dataset.coords = `${i}-${j}`
-        }
-      }
+    let trColHints = makeChild(table, 'tr')
+    makeChild(trColHints, 'td')
+    for (let hints of this.colHints) {
+      makeChild(trColHints, 'td', ['col-hints']).innerHTML = hints.join('<br>')
     }
 
+    for (let [i, hints] of enumerate(this.rowHints)) {
+      let tr = makeChild(table, 'tr')
+      makeChild(tr, 'td', ['row-hints']).innerText = hints.join(' ')
+      for (let j = 0; j < this.cols; j++) {
+        let cell = makeChild(tr, 'td', ['cell'])
+        cell.dataset.coords = `${i}-${j}`
+        cell.addEventListener('click', event => {
+          let [y, x] = event.target.dataset.coords.split('-').map(x => parseInt(x))
+          clickCallback(y, x, true)
+        })
+        cell.addEventListener('contextmenu', event => {
+          event.preventDefault()
+          let [y, x] = event.target.dataset.coords.split('-').map(x => parseInt(x))
+          clickCallback(y, x, false)
+        })
+      }
+    }
+  }
+
+  render (root) {
     let table = root.querySelector('table')
     for (let i = 0; i < this.rows; i++) {
       for (let j = 0; j < this.cols; j++) {
