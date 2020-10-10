@@ -91,43 +91,48 @@ function rowPlaceFirstBlock(row) {
   }
 
   // now we know the first block cannot start to the left of
-  // `start`. if there are any blocks that are already filled
-  // among `start, start + 1, ..., start + blockSize - 1`, those
-  // must all belong to the first block (if they belong to
-  // the second, the first has nowhere to go), so we can
+  // `start`.
+  // maybe we can place the first block uniquely now?
+  // dealing with this here simplifies some cases below.
+  if (start + blockSize === row.length()) {
+    for (let i = start; i < start + blockSize; i++) {
+      row.set(i, CellState.Filled)
+    }
+    return
+  }
+
+  // if there are any cells that are already filled
+  // among `start, start + 1, ..., start + blockSize`
+  // (notice that that's `(blockSize + 1)` cells in total!),
+  // those must all belong to the first block (if they belong
+  // to the second, the first has nowhere to go), so we can
   // connect them all and maybe get additional constraints.
-  if (!takeAfter(row.snapshot(), start, blockSize).some(c => c == CellState.Filled)) {
+  if (!takeAfter(row.snapshot(), start, blockSize + 1).some(c => c == CellState.Filled)) {
     return
   }
   let leftmostFilled = start
   while (row.get(leftmostFilled) != CellState.Filled) {
     leftmostFilled++
   }
-  let rightmostFilled = start + blockSize - 1
-  while (row.get(rightmostFilled) != CellState.Filled) {
-    rightmostFilled--
-  }
 
-  // e.g. .x.x... -> .xxx...
-  for (let i = leftmostFilled + 1; i < rightmostFilled; i++) {
+  // if `leftmostFilled` is filled, then everything
+  // from there to `start + blockSize - 1` must be filled
+  // (because there aren't enough empty cells to the left
+  // of `leftmostFilled` to add up to `blockSize`).
+  // e.g. if blockSize is 5,
+  //      .x.x... -> .xxxx..
+  for (let i = leftmostFilled + 1; i < start + blockSize; i++)
+  {
     row.set(i, CellState.Filled)
   }
 
-  // if `rightmostFilled - start + 1 < blockSize`, then there are
-  // more cells to the right of `rightmostFilled` that are guaranteed
-  // to be filled.
-  // e.g. .xx... -> .xxx..
-  while (rightmostFilled - start + 1 < blockSize) {
-    rightmostFilled++
-    row.set(rightmostFilled, CellState.Filled)
-  }
-
-  // now, if `rightmostFilled` is in fact `start + blockSize - 1`,
-  // then it might be followed by more filled cells, which would
-  // then also be part of the first block. this allows us to mark
+  // if there are more filled cells after `start + blockSize - 1`,
+  // those must also be part of the first block since they connect
+  // to the ones we just found. this allows us to mark
   // some of `start, start + 1, ...` as empty.
   // e.g. ..xxx.. -> -.xxx..
   //         ^ rightmostFilled
+  let rightmostFilled = start + blockSize - 1
   while (
     (rightmostFilled < row.length() - 1)
     && (row.get(rightmostFilled + 1) == CellState.Filled)
